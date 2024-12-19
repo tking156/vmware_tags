@@ -1,0 +1,33 @@
+---
+galaxy_info:
+  author: Richard Vanek
+  description: Standardized returncode reporting
+  company: Kyndryl
+  license: Kyndryl Intellectual Property
+  min_ansible_version: 2.9
+  galaxy_tags:
+    - reporting
+    - block
+    - blocks
+    - buildingblocks
+    - status
+    - cacm
+    - dashboard
+    - return
+    - code
+    - returncode
+
+  platforms:
+    - name: GenericBSD
+      versions:
+        - all
+    - name: GenericLinux
+      versions:
+        - all
+    - name: GenericUNIX
+      versions:
+        - all
+    - name: Windows
+      versions:
+        - all
+dependencies: []

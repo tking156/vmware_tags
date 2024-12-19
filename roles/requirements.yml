@@ -1,0 +1,45 @@
+#  # This role is setting up an unix socket tunnel across jumphosts and
+#  # create a socket file which is used to connect windows endpoint.
+# - name: ansible-role-event-socks-tunnel
+#   src: https://github.kyndryl.net/Continuous-Engineering/ansible-role-event-socks-tunnel.git
+#   scm: 'git'
+#   version: 23.5/main
+
+# #   # The SFS Upload Role is a mandatory building block for all use cases utilizing the
+# #   # Secure File Service uploads. Role provides a service for file upload to SFS server.
+# #   # Use of the SFS is restricted to approved use cases.
+# # - name: sfs_upload
+# #   src: https://github.kyndryl.net/Continuous-Engineering/ansible_role_sfs_upload.git
+# #   scm: 'git'
+# #   version: 4.0/main
+
+#   # This Ansible Role ensures generation of standardized,
+#   # structured results from execution of Ansible Playbooks (Custom stats).
+#   # This result contains status information about success of execution even
+#   # on detail of particular actions (if needed) with information, what is the reason
+#   # for potential unsuccessful execution.
+# - name: returncode
+#   src: https://github.kyndryl.net/Continuous-Engineering/ansible_role_returncode.git
+#   scm: 'git'
+#   version: 1.4/main
+
+#    # This Ansible Role ensures generation of standardized,
+#   # structured results from execution of Ansible Playbooks (Custom stats).
+#   # This result contains status information about success of execution even
+#   # on detail of particular actions (if needed) with information, what is the reason
+#   # for potential unsuccessful execution.
+# - name: ansible_role_returncode
+#   src: https://github.kyndryl.net/Continuous-Engineering/ansible_role_returncode.git
+#   scm: 'git'
+#   version: 1.4/main
+
+# #   # This Ansible Role is used for validation the connectivity to Endpoints from Ansible Tower.
+# #   # Particular reasons for connectivity problems are identified via Return Codes.
+# # - name: connection_validator
+# #   src: https://github.kyndryl.net/Continuous-Engineering/ansible_role_connection_validator
+# #   scm: 'git'
+# #   version: dev
+# - name: vcenter_find_vms
+#   src: https://github.kyndryl.net/Continuous-Engineering/vcenters_find_vms.git
+#   scm: 'git'
+#   version: main

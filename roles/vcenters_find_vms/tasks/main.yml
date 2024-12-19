@@ -1,0 +1,327 @@
+---
+# Tasks file for ansible-template-role
+#
+# Initial variables for event automation extended return codes if it is event automation
+# Use https://github.kyndryl.net/Continuous-Engineering/CACM_Common_Repository/wiki/Rules-for-definition-of-Return-Codes
+- name: Initial exec variables
+  ansible.builtin.set_fact:
+    exec_success: false
+    exec_changed: false
+    exec_rc: 1
+    exec_message: |
+      Initializing event return codes for vcenters_find_vms
+  when: vfv_eventautomation
+#
+# This Ansible task is used to convert a string of virtual machine (VM) names and vCenter server names into lists.
+# The task uses the `ansible.builtin.set_fact` module to define two new facts: `vfv_vm_names` and `vfv_vcenter_names`.
+# The `vfv_vm_names` fact is set to the result of splitting the `vfv_vmware_guest_names` string by a delimiter.
+# The `split(vfv_delimiter)` function is used to split the string into a list of substrings, where each substring is a VM name.
+# The delimiter used for splitting is defined in the defaults/main.yml file for the role and can be overridden with extra_vars if needed.
+# The vfv_vcenter_names fact is set to the result of splitting the vfv_vmware_vcenter_names string by a delimiter, in the same way as vfv_vmware_guest_names
+# The `if else` construct allows input as either a string or a list to be used.
+- name: Converting string of VMs names into list of vfv_vm_names
+  ansible.builtin.set_fact:
+    vfv_vm_names: "{{ vfv_vmware_guest_names.split(vfv_delimiter)
+                        if vfv_vmware_guest_names is string and
+                        vfv_vmware_guest_names | trim | length > 0
+                        else vfv_vmware_guest_names }}"
+    vfv_vcenter_names: "{{ vfv_vmware_vcenter_names.split(vfv_delimiter)
+                                if vfv_vmware_vcenter_names is string and
+                                vfv_vmware_vcenter_names | trim | length > 0
+                                else vfv_vmware_vcenter_names }}"
+#
+# This Ansible task uses the `ansible.builtin.assert` module to ensure that:
+#    `vfv_vm_names` variable is a list and is not empty.
+#    `vfv_vcenter_names` variable is a list and is not empty.
+#    `credtype_vc_server` credential is not present
+# If an assertion fails, the module will use the ansible_role_returncode role and stop the playbook execution and return an error message.
+- name: Block for validating all required variables and vcenter cred exists
+  block:
+    - name: Use assert module to assure vfv_vm_names & vfv_vcenter_names are lists and not empty, credtype_vc_server is present
+      ansible.builtin.assert:
+        that:
+          - vfv_vm_names is iterable
+          - vfv_vm_names | length > 0
+          - vfv_vcenter_names is iterable
+          - vfv_vcenter_names | length > 0
+          - lookup('ansible.builtin.env', 'vc_app_user') | length > 0
+          - lookup('ansible.builtin.env', 'vc_app_password') | length > 0
+        fail_msg: Invalid role configuration
+  # if we failed the assert use rescue to set return codes etc and fail playbook
+  rescue:
+      # Set returncode and event automation facts if only vfv_vm_names is bad
+    - name: Set exec vars vfv_vmware_guest_names is invalid or empty
+      ansible.builtin.set_fact:
+        exec_success: false
+        exec_changed: false
+        exec_rc: 1000
+        exec_message: |
+          vfv_vmware_guest_names is invalid or empty
+        vfv_rc_number: 3000
+        vfv_rc_message: "vfv_vmware_guest_names is invalid or empty"
+      when:
+        - vfv_vm_names is iterable
+        - vfv_vm_names | length > 0
+
+      # Set returncode and event automation facts if only vfv_vm_names is bad
+    - name: Set exec vars vfv_vmware_vcenter_names is invalid or empty
+      ansible.builtin.set_fact:
+        exec_success: false
+        exec_changed: false
+        exec_rc: 1001
+        exec_message: |
+          vfv_vmware_vcenter_names is invalid or empty
+        vfv_rc_number: 3001
+        vfv_rc_message: "vfv_vmware_vcenter_names is invalid or empty"
+      when:
+        - vfv_vcenter_names is iterable
+        - vfv_vcenter_names | length > 0
+
+      # Set returncode and event automation facts if only vfv_vm_names is bad
+    - name: Set exec vars vfv_vmware_vcenter_names and vfv_vmware_guest_names are both invalid or empty
+      ansible.builtin.set_fact:
+        exec_success: false
+        exec_changed: false
+        exec_rc: 1002
+        exec_message: |
+          vfv_vmware_vcenter_names and vfv_vmware_guest_names are both invalid or empty
+        vfv_rc_number: 3002
+        vfv_rc_message: "vfv_vmware_vcenter_names and vfv_vmware_guest_names are both invalid or empty"
+      when:
+        - vfv_vm_names is iterable
+        - vfv_vm_names | length > 0
+        - vfv_vcenter_names is iterable
+        - vfv_vcenter_names | length > 0
+
+      # Set returncode and event automation facts if only vfv_vm_names is bad
+    - name: Set exec vars credtype_vc_server credential is not present
+      ansible.builtin.set_fact:
+        exec_success: false
+        exec_changed: false
+        exec_rc: 1003
+        exec_message: |
+          credtype_vc_server credential is not present
+        vfv_rc_number: 3003
+        vfv_rc_message: "credtype_vc_server credential is not present"
+      when:
+        - lookup('ansible.builtin.env', 'vc_app_user') | length == 0
+        - lookup('ansible.builtin.env', 'vc_app_password') | length == 0
+      #
+      # using only one call to return codes to avoid the overhead of multiple calls
+      # when both vfv_vcenter_names and vfv_vm_names are bad, lets us report both in one error.
+      # We only use returncode when not using event automation
+    - name: Set return codes missing config items & not using event automation
+      ansible.builtin.include_role:
+        name: returncode
+      vars:
+        # some of these set in vars/main.yml
+        rc_support: "{{ vfv_rc_support }}"
+        rc_group: "{{ vfv_rc_group }}"
+        rc_number: "{{ vfv_rc_number }}"
+        rc_message: "{{ vfv_rc_message }}"
+        documentation: "{{ vfv_documentation }}"
+      when: not vfv_eventautomation
+      #
+      # This is the last task in the `rescue` section and uses the `ansible.builtin.fail` module
+      # to stop the playbook execution and display a message when a problem with one or more of
+      # vmware_vcenter_name, vmware_guest_name, credtype_vc_server
+    - name: Fail the role when Role pre-requisite not met
+      ansible.builtin.fail:
+        msg: "{{ vfv_rc_message }}"
+#
+# This Ansible task is designed to use the `community.vmware.vmware_guest_info` module to
+# gather information about each virtual machine (VM) in a list of vCenter servers.
+# The `community.vmware.vmware_guest_info` module connects to a vCenter server and retrieves information about a VM.
+# The `hostname` parameter is set to `item[1]`, which represents the current vCenter server name in the loop.
+# The `name` parameter is set to `item[0]`, which represents the current VM name in the loop.
+# The `username` and `password` parameters are set using the environment lookup of values that are set in an AAP credential.
+- name: Using community.vmware.vmware_guest_info check each vfv_vcenter_names for existence of vfv_vm_names
+  community.vmware.vmware_guest_info:
+    hostname: "{{ item[1] }}"
+    username: "{{ lookup('ansible.builtin.env', 'vc_app_user') | default('missing_user') }}"
+    password: "{{ lookup('ansible.builtin.env', 'vc_app_password') | default('missing_pwd') }}"
+    datacenter: ""
+    name: "{{ item[0] }}"
+    validate_certs: "{{ vfv_vmware_validate_certs | bool }}"
+    schema: vsphere
+    properties:
+      - summary.overallStatus
+  register: guest_info
+  ignore_errors: true
+  loop: "{{  vfv_vm_names | product(vfv_vcenter_names) | list }}"
+#
+# This Ansible task is designed to create a list of dictionaries, each containing information about a virtual machine (VM)
+# The information includes the VM's name and the hostname of the vCenter it resides on.
+# Each dictionary represents a VM and contains two keys: `guest` and `vcenter`.
+# The `guest` key corresponds to the name of the VM,
+# and the `vcenter` key corresponds to the hostname of the vCenter that the VM is on.
+# The `loop` keyword is used to iterate over the `guest_info.results` list.
+# For each item in the list, a new dictionary to the `vfv_vm_vcenter` list.
+# The `default( [] )` function is used to initialize `vfv_vm_vcenter` as an empty list if it doesn't already exist.
+# The `loop_control` keyword is used to customize the output of the loop.
+# The `label` option is set to display the name and hostname of the VM for each iteration.
+# The `when` keyword is a conditional statement that checks if the current item in the loop has not failed.
+# If the item has not failed, then the `ansible.builtin.set_fact` module is invoked for that item.
+# If the item has failed, then the module is not invoked for that item.
+# This ensures that only successful items are added to the `vfv_vm_vcenter` list.
+#
+# We expect other playbooks to consume this vfv_vm_vcenter variable to perform tasks.
+- name: From guest_info create a list of dictionaries containing vms and vcenter they exist on
+  ansible.builtin.set_fact:
+    vfv_vm_vcenter: "{{ vfv_vm_vcenter + [{'guest': item.invocation.module_args.name, 'vcenter': item.invocation.module_args.hostname}] }}"
+  loop: "{{ guest_info.results }}"
+  loop_control:
+    label: "{{ item.invocation.module_args.name }} - {{ item.invocation.module_args.hostname }}"
+  when: item is not failed
+  #
+  # detect that we are using a cred with a bad password or wrong id etc.
+  # if that is the case we fail the role with a return code showing
+  # that the cred is bad, not missing, just bad
+- name: Detect a bad password in the vcenter credential
+  block:
+      # detect bad credential for credtype_vc_server, but the vcenter is right
+    - name: From guest_info create a list of dictionaries containing vcenter where cred was bad
+      ansible.builtin.set_fact:
+        vfv_vcenter_login_failed: "{{ vfv_vcenter_login_failed + [ item.invocation.module_args.hostname ] }}"
+      loop: "{{ guest_info.results }}"
+      loop_control:
+        label: "{{ item.invocation.module_args.hostname }} login failed"
+      when:
+        - item is failed
+        - '"incorrect user name or password" in item.msg'
+        - item.invocation.module_args.hostname not in vfv_vcenter_login_failed
+      # fail on vcenter login failure
+    - name: Fail if a vcenter login failure (bad cred)
+      ansible.builtin.fail:
+        msg: |
+          vcenter Login failures
+          {{ vfv_vcenter_login_failed }}
+      when:
+        - vfv_vcenter_login_failed | length > 0
+  rescue:
+    - name: Set exec vars login failure using credtype_vc_server
+      ansible.builtin.set_fact:
+        exec_success: false
+        exec_changed: false
+        exec_rc: 1004
+        exec_message: |
+          login failure with credtype_vc_server credential, check your cred
+          {{ vfv_vcenter_login_failed }}
+        vfv_rc_number: 3004
+        vfv_rc_message: |
+          login failure with credtype_vc_server credential, check your cred
+          {{ vfv_vcenter_login_failed }}
+      # perform return code
+    - name: Vcenter login failures return_code
+      ansible.builtin.include_role:
+        name: ansible_role_returncode
+      vars:
+        # some of these set in vars/main.yml
+        rc_support: "{{ vfv_rc_support }}"
+        rc_group: "{{ vfv_rc_group }}"
+        rc_number: "{{ vfv_rc_number }}"
+        rc_message: "{{ vfv_rc_message }}"
+        documentation: "{{ vfv_documentation }}"
+      when: not vfv_eventautomation
+
+    - name: Fail the playbook if a vcenter login failure (bad cred)
+      ansible.builtin.fail:
+        msg: "{{ vfv_rc_message }}"
+#
+# The `guests_missed` fact is a list that is populated with the names of VMs that were not found.
+# This list is generated by taking the `vfv_vm_names` list,
+# removing duplicates with the `unique` filter,
+# converting all names to lowercase with the `map('lower')` function,
+# converting the result back into a list with the `list` function.
+# From this list, the names of the VMs that were found are removed using the `difference` function.
+# The `vfv_vm_vcenter | json_query('[*].guest') | map('lower') | list` expression is used to
+# generate a list of the names of the VMs that were found, converted to lowercase.
+# The `list` function is used again to convert the result of the `difference` function into a list.
+# The `vfv_vcenter_missed` fact is a list that is populated with the names of vCenter servers that were not found.
+# This list is generated in the same way as the `guests_missed` list,
+# but with the `vfv_vcenter_names` list and the `vfv_vm_vcenter | json_query('[*].vcenter') | map('lower') | list` expression.
+#
+# The result is two lists of names that were not found, one for VMs and one for vCenter servers.
+# These lists can be used in later tasks/playbooks to handle these missing entities.
+- name: Set VMs not found into guests_missed, Set vcenter not found into vfv_vcenter_missed
+  ansible.builtin.set_fact:
+    vfv_guests_missed: "{{ vfv_vm_names | unique | map('lower') | list | difference(vfv_vm_vcenter | json_query('[*].guest') | map('lower') | list) }}"
+    vfv_guests_found: "{{ vfv_vm_names | unique | map('lower') | list | intersect(vfv_vm_vcenter | json_query('[*].guest') | map('lower') | list) }}"
+    vfv_vcenter_missed: "{{ vfv_vcenter_names | unique | map('lower') | list | difference(vfv_vm_vcenter | json_query('[*].vcenter') | map('lower') | list) }}"
+    vfv_vcenter_found: "{{ vfv_vcenter_names | unique | map('lower') | list | intersect(vfv_vm_vcenter | json_query('[*].vcenter') | map('lower') | list) }}"
+  # set exec variables for later
+- name: Set exec variables if vfv_vmware_vcenter_names has an invalid entry
+  ansible.builtin.set_fact:
+    exec_success: false
+    exec_changed: false
+    exec_rc: 1005
+    exec_message: |
+      vfv_vmware_vcenter_names has an invalid entry
+      {{ vfv_vcenter_missed }}
+    vfv_rc_message: |
+      {{ vfv_rc_message }}
+      vfv_vmware_vcenter_names has an invalid entry
+      {{ vfv_vcenter_missed }}
+    vfv_rc_support: account
+    vfv_rc_group: misconfiguration
+    vfv_rc_number: 3005
+  when: vfv_vcenter_missed | length > 0
+  # set exec variables
+- name: Set exec variables if vfv_vmware_guest_names has an invalid entry
+  ansible.builtin.set_fact:
+    exec_success: false
+    exec_changed: false
+    exec_rc: 1006
+    exec_message: |
+      {{ exec_message | default("") }}
+      vfv_vmware_guest_names has an invalid entry
+      {{ vfv_guests_missed }}
+    vfv_rc_message: |
+      {{ vfv_rc_message }}
+      vfv_vmware_guest_names has an invalid entry
+      {{ vfv_guests_missed }}
+    vfv_rc_support: account
+    vfv_rc_group: misconfiguration
+    vfv_rc_number: 3006
+  when: vfv_guests_missed | length > 0
+  #
+  # no need to change messages as they are cumulative
+  # just change the codes
+- name: Set variables if vfv_vmware_guest_names and vfv_vmware_vcenter_names has an invalid entry
+  ansible.builtin.set_fact:
+    exec_rc: 1007
+    vfv_rc_number: 3007
+  when:
+    - vfv_guests_missed | length > 0
+    - vfv_vcenter_missed | length > 0
+  # perform return codes
+- name: Set return codes missing config items & not using event automation
+  ansible.builtin.include_role:
+    name: returncode
+  vars:
+    # some of these set in vars/main.yml
+    rc_support: "{{ vfv_rc_support }}"
+    rc_group: "{{ vfv_rc_group }}"
+    rc_number: "{{ vfv_rc_number }}"
+    rc_message: "{{ vfv_rc_message }}"
+    documentation: "{{ vfv_documentation }}"
+  when:
+    - vfv_guests_missed | length > 0
+    - vfv_vcenter_missed | length > 0
+    - not vfv_eventautomation
+  # Fail the playbook if requested
+- name: Fail the playbook vfv_vmware_guest_names has an invalid entry
+  ansible.builtin.fail:
+    msg: "{{ vfv_rc_message }}"
+  when:
+    - ((vfv_fail_invalid_guest and guests_missed | length > 0) or (vfv_fail_invalid_vcenter and vfv_vcenter_missed | length > 0))
+  #
+  # Need to report success when everything was good
+- name: Success end of building block
+  ansible.builtin.include_role:
+    name: returncode
+  vars:
+    rc_success: true
+    store_results_in_custom_stats: false
+  when:
+    - returncode is undefined or returncode == "0"

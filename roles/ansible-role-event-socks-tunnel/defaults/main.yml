@@ -1,0 +1,15 @@
+---
+# defaults file for ansible-role
+
+acc_id: "{{ blueid_shortcode | default('NA') }}"
+transaction_id: "{{ tower_job_id | default(999999999999999 | random(start=1)) | replace('\"', '') }}"
+socks_serveraliveinterval: true
+socks_serveralivecountmax: true
+socks_exitonforwardfailure: true
+socks_stricthostkeychecking: true
+socks_userknownhostsfile: true
+socks_controlmaster: true
+socks_controlpersist: true
+socks_switches: true
+socks_identitiesonly: false
+socks_nopasswordauthentication: true

@@ -1,0 +1,38 @@
+---
+- name: Set job properties
+  delegate_to: localhost
+  delegate_facts: true
+  run_once: true
+  block:
+    - name: Set standard job properties runtime variable
+      set_fact:
+        job_properties_runtime: "{{
+          hostvars['localhost']['job_properties_runtime'] | d({}) \
+          | combine({ 'asset_name': asset_name}, recursive=true) \
+          | combine({ 'documentation': documentation }, recursive=true) }}"
+      vars:
+        asset_name: "{{ asset_name | d('unknown') }}"
+        documentation: "{{ documentation | d({}) }}"
+
+    - name: Set custom job properties runtime variable
+      set_fact:
+        job_properties_runtime: "{{
+          hostvars['localhost']['job_properties_runtime'] \
+          | combine(custom_job_properties, recursive=true) }}"
+      when: custom_job_properties is defined
+
+    - name: Set job properties in custom stats
+      set_stats:
+        data:
+          job_properties:
+            "{{ hostvars['localhost']['job_properties_runtime'] }}"
+  rescue:
+    - name: Print Ansible failed task name
+      debug:
+        msg: "{{ ansible_failed_task[''name'']  | d('Unknown error') }}"
+      when: ansible_failed_task is defined
+
+    - name: Unable to set job properties
+      debug:
+        msg: "{{ ansible_failed_result[''msg''] | d('Unknown error') }}"
+      when: ansible_failed_result is defined

@@ -1,0 +1,44 @@
+version: '2.0'
+networks:
+  level1:
+    driver: bridge
+  level2:
+    driver: bridge
+  level3:
+    driver: bridge
+  level4:
+    driver: bridge
+  level5:
+    driver: bridge
+services:
+  jump_host_1:
+    build: .
+    hostname: jump_host_1
+    ports:
+      - "1122:22"
+    networks:
+      - level1
+  jump_host_2:
+    build: .
+    hostname: jump_host_2
+    networks:
+      - level1
+      - level2
+  jump_host_3:
+    build: .
+    hostname: jump_host_3
+    networks:
+      - level2
+      - level3
+  jump_host_4:
+    build: .
+    hostname: jump_host_4
+    networks:
+      - level3
+      - level4
+  jump_host_5:
+    build: .
+    hostname: jump_host_5
+    networks:
+      - level4
+      - level5

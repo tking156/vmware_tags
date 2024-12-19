@@ -1,0 +1,109 @@
+---
+- name: "Prepare variables"
+  set_fact:
+    rc_support: "{{ rc_variables['rc_support'] | d('developer') }}"
+    rc_group: "{{ rc_variables['rc_group'] | d('framework_playbook') }}"
+    rc_number: "{{ rc_variables['rc_number'] | d('999') }}"
+    rc_message: "{{ rc_variables['rc_message'] | d('') }}"
+    documentation: "{{ rc_variables['documentation'] | d('') }}"
+  when: rc_variables is defined
+
+- name: "Generate RC"
+  set_fact:
+    returncode_message: "{{ rc_message|d('') }}"
+    returncode: >-
+      {% if returncode_success | bool  %}0{% else %}{{
+      returncode_string | replace(' ', '-') }}{% endif %}
+  vars:
+    returncode_success: >-
+      {{ (rc_success | d(false) | bool) }}
+    returncode_support_groups_number: >-
+      {{ returncode_support_groups[rc_support | d('developer')] }}
+    returncode_rc_groups_number: >-
+      {{ returncode_rc_groups[rc_group | d('framework_playbook')] }}
+    returncode_rc_number: "{{ rc_number | d('999') }}"
+    returncode_string: >-
+      {{ returncode_support_groups_number }}
+      {{ returncode_rc_groups_number }}
+      {{ returncode_rc_number }}
+
+- name: "Log job results - prepare 2 level values"
+  set_fact:
+    job_results_runtime: >-
+      {{
+      (hostvars[inventory_hostname]['job_results_runtime'] | d({}))
+      | combine({
+          rc_host: {
+            action_name_level1_p: {
+              action_name_level2_p: (
+                { action_key_name_p: result_action_value_p }
+                | combine(message_part, recursive=true)
+                | combine(documentation_part, recursive=true)
+              )
+            }
+          }
+        }, recursive=true)
+      }}
+  vars:
+    action_name_level1_p: "{{ action_name_level1 | d('generic') }}"
+    action_name_level2_p: "{{ action_name_level2 | d('generic') }}"
+    action_key_name_p: "{{ action_key_name | d('action_rc') }}"
+    result_action_value_p: "{{ result_action_value | d(returncode) }}"
+    message_part: "{{ {'message': rc_message} if rc_message is defined and rc_message | length > 0 else {} }}"
+    documentation_part: "{{ {'documentation': documentation} if documentation is defined and documentation | length > 0 else {} }}"
+  when:
+    - action_name_level1 is defined
+    - action_name_level2 is defined
+    - store_results_in_custom_stats
+
+- name: "Log job results - prepare 1 level values"
+  set_fact:
+    job_results_runtime: >-
+      {{
+      (hostvars[inventory_hostname]['job_results_runtime'] | d({}))
+      | combine({
+        rc_host: {
+          action_name_level1_p: (
+            {
+              action_key_name_p: result_action_value_p
+            }
+            | combine(message_part, recursive=true)
+            | combine(documentation_part, recursive=true)
+          )
+        }
+      }, recursive=true)
+      }}
+  vars:
+    action_name_level1_p: "{{ action_name_level1 | d('generic') }}"
+    action_key_name_p: "{{ action_key_name | d('action_rc') }}"
+    result_action_value_p: "{{ result_action_value | d(returncode) }}"
+    message_part: "{{ {'message': rc_message} if rc_message is defined and rc_message | length > 0 else {} }}"
+    documentation_part: "{{ {'documentation': documentation} if documentation is defined and documentation | length > 0 else {} }}"
+  when:
+    - action_name_level2 is not defined
+    - store_results_in_custom_stats
+  # - action_name_level1 is defined
+
+# Disabled to make integration with Dashboard easier
+# - name: "Log job results - prepare single rc values"
+#   set_fact:
+#     job_results_runtime: "{{
+#     (hostvars[inventory_hostname]['job_results_runtime'] | d({})) \
+#       | combine({ rc_host: \
+#       ({ action_key_name_p: result_action_value_p }\
+#       | combine( message_part, recursive=true) ) }, recursive=true) }}"
+#   vars:
+#     action_key_name_p: "{{ action_key_name | default('action_rc') }}"
+#     result_action_value_p: "{{ result_action_value | d(returncode) }}"
+#     message_part: "{{ { 'message' : rc_message|d('') } if \
+#     rc_message is defined else {} }}"
+#   when:
+#     - action_name_level1 is not defined
+#     - action_name_level2 is not defined
+#     - store_results_in_custom_stats
+
+- name: "Log job results - set Custom stats"
+  set_stats:
+    data:
+      job_results: "{{ job_results_runtime }}"
+  when: store_results_in_custom_stats

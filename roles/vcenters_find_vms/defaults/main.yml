@@ -1,0 +1,13 @@
+---
+# defaults file for vcenters_find_vms
+vfv_delimiter: ','
+vfv_eventautomation: false
+vfv_fail_invalid_vcenter: false
+vfv_fail_invalid_guest: false
+vfv_vmware_validate_certs: false
+vfv_vmware_guest_names:
+  - myguest1
+  - myguest2
+vfv_vmware_vcenter_names:
+  - myvcenter1
+  - myvcenter2

@@ -1,0 +1,110 @@
+---
+- hosts: localhost
+  tags: one_hop
+  gather_facts: false
+  pre_tasks:
+    - name: Set input variables
+      set_fact:
+        jh_socks_port: 2222
+
+        jh1_ip: "127.0.0.1"
+        jh1_ssh_port: 1122
+        jh1_ssh_user: root
+  roles:
+    - ansible-role-event-socks-tunnel
+
+- hosts: localhost
+  tags: two_hop
+  gather_facts: false
+  pre_tasks:
+    - name: Set input variables
+      set_fact:
+        jh_socks_port: 2222
+
+        jh1_ip: "127.0.0.1"
+        jh1_ssh_port: 1122
+        jh1_ssh_user: root
+
+        jh2_ip: jump_host_2
+        jh2_ssh_port: 22
+        jh2_ssh_user: root
+  roles:
+    - ansible-role-event-socks-tunnel
+
+- hosts: localhost
+  tags: three_hop
+  gather_facts: false
+  pre_tasks:
+    - name: Set input variables
+      set_fact:
+        jh_socks_port: 2222
+
+        jh1_ip: "127.0.0.1"
+        jh1_ssh_port: 1122
+        jh1_ssh_user: root
+
+        jh2_ip: jump_host_2
+        jh2_ssh_port: 22
+        jh2_ssh_user: root
+
+        jh3_ip: jump_host_3
+        jh3_ssh_port: 22
+        jh3_ssh_user: root
+  roles:
+    - ansible-role-event-socks-tunnel
+
+- hosts: localhost
+  tags: four_hop
+  gather_facts: false
+  pre_tasks:
+    - name: Set input variables
+      set_fact:
+        jh_socks_port: 2222
+
+        jh1_ip: "127.0.0.1"
+        jh1_ssh_port: 1122
+        jh1_ssh_user: root
+
+        jh2_ip: jump_host_2
+        jh2_ssh_port: 22
+        jh2_ssh_user: root
+
+        jh3_ip: jump_host_3
+        jh3_ssh_port: 22
+        jh3_ssh_user: root
+
+        jh4_ip: jump_host_4
+        jh4_ssh_port: 22
+        jh4_ssh_user: root
+  roles:
+    - ansible-role-event-socks-tunnel
+
+- hosts: localhost
+  tags: five_hop
+  gather_facts: false
+  pre_tasks:
+    - name: Set input variables
+      set_fact:
+        jh_socks_port: 2222
+
+        jh1_ip: "127.0.0.1"
+        jh1_ssh_port: 1122
+        jh1_ssh_user: root
+
+        jh2_ip: jump_host_2
+        jh2_ssh_port: 22
+        jh2_ssh_user: root
+
+        jh3_ip: jump_host_3
+        jh3_ssh_port: 22
+        jh3_ssh_user: root
+
+        jh4_ip: jump_host_4
+        jh4_ssh_port: 22
+        jh4_ssh_user: root
+
+        jh5_ip: jump_host_5
+        jh5_ssh_port: 22
+        jh5_ssh_user: root
+  roles:
+    - ansible-role-event-socks-tunnel

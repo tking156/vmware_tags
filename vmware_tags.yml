@@ -1,0 +1,161 @@
+---
+- name: Play to setup environment
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ default_ansible_python_interpreter }}"
+  tasks:
+    # Calling socks tunnel role if we have windows endpoint and localhost is defined in limits
+    # we use the tower_job_id as transaction_id as it is always unique between executions
+    - name: Role ensures that the socks tunnel is setup
+      ansible.builtin.import_role:
+        name: ansible-role-event-socks-tunnel
+      vars:
+        acc_id: "{{ blueid_shortcode }}"
+        transaction_id: "{{ tower_job_id }}"
+
+# Tasks on endpoints
+- name: Run the tasks on the endpoints
+  hosts: all
+  ignore_unreachable: false
+  gather_facts: false
+  # environment:
+  #   ansible_python_interpreter: /usr/bin/python3.12
+  vars:
+    ansible_python_interpreter: "{{ extra_ansible_python_interpreter }}"
+  tasks:
+    - name: Set link to documentation and name of this tool
+      ansible.builtin.include_role:
+        name: returncode
+        tasks_from: set_job_properties
+      vars:
+        asset_name: "vmware_tags"
+        documentation:
+          default: "https://github.kyndryl.net/CACF-NA-Anthem/vmware_tags.git"
+
+      # Execution block to get hosts list from vcenter
+    - name: Execution block 1
+      block:
+        # Use the roll for vcenter_find_vms to fetch which vcenter each VM is on
+        - name: include roll to get vcenter vms belong to
+          ansible.builtin.include_role:
+            name: vcenter_find_vms
+          vars:
+            vfv_vmware_vcenter_names: "{{ vt_vcenters_list }}"
+            vfv_vmware_guest_names: "{{ vt_guests_list }}"
+          register: vt_vfv_return
+
+    - name: Collect vm tags without details from vCenters and VMs with guest_info
+      community.vmware.vmware_guest_info:
+        hostname: "{{ item.vcenter }}"
+        username: "{{ lookup('ansible.builtin.env', 'vc_app_user') | default('missing_user') }}"
+        password: "{{ lookup('ansible.builtin.env', 'vc_app_password') | default('missing_pwd') }}"
+        validate_certs: "{{ vt_vmware_validate_certs }}"
+        schema: vsphere
+        properties:
+          # - guest.net
+          - overallStatus
+        datacenter: ""
+        folder: ""
+        name: "{{ item.guest }}"
+        tags: true
+        tag_details: false
+      loop: "{{ vfv_vm_vcenter }}"
+      register: guest_info_results
+
+    - name: "Print the guest_info without details"
+      debug:
+        var: guest_info_results
+
+    - name: Collect vm tags without details from vCenters and VMs with guest_info
+      community.vmware.vmware_guest_info:
+        hostname: "{{ item.vcenter }}"
+        username: "{{ lookup('ansible.builtin.env', 'vc_app_user') | default('missing_user') }}"
+        password: "{{ lookup('ansible.builtin.env', 'vc_app_password') | default('missing_pwd') }}"
+        validate_certs: "{{ vt_vmware_validate_certs }}"
+        schema: vsphere
+        properties:
+          # - guest.net
+          - overallStatus
+        datacenter: ""
+        folder: ""
+        name: "{{ item.guest }}"
+        tags: true
+        tag_details: true
+      loop: "{{ vfv_vm_vcenter }}"
+      register: guest_info_details_results
+
+    - name: "Print the guest_info with details"
+      debug:
+        var: guest_info_details_results
+
+    - name: debug vfv_vm_vcenter before append
+      debug:
+        var: vfv_vm_vcenter
+
+      # add the tags you will associate to the vfv_vm_vcenter structure
+    - name: append vt_associate_tags to vfv_vm_vcenter
+      set_fact:
+        vfv_vm_vcenter: "{{ vfv_vm_vcenter | map('combine', {'associate_tags': vt_associate_tags}) | list }}"
+      when:
+        - vt_associate_tags is defined
+        - vt_associate_tags is not none
+
+      # add the tags you will disassociate to the vfv_vm_vcenter structure
+    - name: append vt_disassociate_tags to vfv_vm_vcenter
+      set_fact:
+        vfv_vm_vcenter: "{{ vfv_vm_vcenter | map('combine', {'disassociate_tags': vt_disassociate_tags}) | list }}"
+      when:
+        - vt_disassociate_tags is defined
+        - vt_disassociate_tags is not none
+
+      # show us the vfv_vm_vcenter structure after appending the tags
+    - name: debug vfv_vm_vcenter after append
+      debug:
+        var: vfv_vm_vcenter
+
+    #   # Associate the tags to the VMs
+    # - name: Use community.vmware.vmware_tag_manager to associate tags to VMs
+    #   community.vmware.vmware_tag_manager:
+    #     hostname: "{{ item.vcenter }}"
+    #     username: "{{ lookup('ansible.builtin.env', 'vc_app_user') | default('missing_user') }}"
+    #     password: "{{ lookup('ansible.builtin.env', 'vc_app_password') | default('missing_pwd') }}"
+    #     validate_certs: "{{ vt_vmware_validate_certs }}"
+    #     object_name: "{{ item.guest }}"
+    #     object_type: "VirtualMachine"
+    #     tag_names: "{{ item.associate_tags }}"
+    #     state: present
+    #   loop: "{{ vfv_vm_vcenter }}"
+    #   register: tag_add_result
+    #   when: item.associate_tags is defined
+
+    #   # Disassociate the tags from the VMs
+    # - name: Use community.vmware.vmware_tag_manager to disassociate tags to VMs
+    #   community.vmware.vmware_tag_manager:
+    #     hostname: "{{ item.vcenter }}"
+    #     username: "{{ lookup('ansible.builtin.env', 'vc_app_user') | default('missing_user') }}"
+    #     password: "{{ lookup('ansible.builtin.env', 'vc_app_password') | default('missing_pwd') }}"
+    #     validate_certs: "{{ vt_vmware_validate_certs }}"
+    #     object_name: "{{ item.guest }}"
+    #     object_type: "VirtualMachine"
+    #     tag_names: "{{ item.disassociate_tags }}"
+    #     state: absent
+    #   loop: "{{ vfv_vm_vcenter }}"
+    #   register: tag_add_result
+    #   when: item.disassociate_tags is defined
+
+
+    # - name: Use community.vmware to read all the tags
+    #   community.vmware.vmware_tag_info:
+    #     hostname: "{{ item.vcenter }}"
+    #     username: "{{ lookup('ansible.builtin.env', 'vc_app_user') | default('missing_user') }}"
+    #     password: "{{ lookup('ansible.builtin.env', 'vc_app_password') | default('missing_pwd') }}"
+    #     validate_certs: "{{ vt_vmware_validate_certs }}"
+    #     # name: "{{ item.guest }}"
+    #   loop: "{{ vfv_vm_vcenter }}"
+    #   register: tag_facts_result
+
+    # - name: "Print the tag_facts_result"
+    #   debug:
+    #     var: tag_facts_result

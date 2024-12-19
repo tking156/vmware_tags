@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  author: Prabir Sengupta
+  description: Under Development. description-TBD
+  company: Kyndryl
+  license: Kyndryl Intellectual Property
+  min_ansible_version: 1.2
+  github_branch: master
+  platforms:
+    - name: GenericLinuxJumphost
+      versions:
+        - all
+  galaxy_tags:
+    - indevelopment
+  role_name: ansible-role-event-socks-tunnel
+dependencies: []

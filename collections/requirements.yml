@@ -1,0 +1,4 @@
+# This is the additional collections and versions to install
+collections:
+  - name: community.vmware
+    version: 4.1.0

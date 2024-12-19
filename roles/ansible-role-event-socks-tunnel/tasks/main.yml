@@ -1,0 +1,184 @@
+---
+
+- name: set account code and transactin|job id
+  set_fact:
+    account_code: "{{ acc_id }}"
+    trans_num: "{{ transaction_id }}"
+
+- name: Set jumphost facts
+  set_fact:
+    "{{ 'jumphost' ~ (level + 1) ~ '_ip' }}": "{{ hostvars['localhost']['jump_hosts'][level]['ip'] }}"
+    "{{ 'jumphost' ~ (level + 1) ~ '_ssh_user' }}": "{{ hostvars['localhost']['jump_hosts'][level]['ssh_user'] }}"
+    "{{ 'jumphost' ~ (level + 1) ~ '_ssh_port' }}": "{{ hostvars['localhost']['jump_hosts'][level]['ssh_port'] }}"
+    "{{ 'jumphost' ~ (level + 1) ~ '_ssh_private_key' }}": "{{ hostvars['localhost']['jump_hosts'][level]['ssh_private_key'] }}"
+    "{{ 'jumphost' ~ (level + 1) ~ '_ssh_private_key_passphrase' }}": "{{
+      hostvars['localhost']['jump_hosts'][level]['ssh_private_key_passphrase']|default('') }}"
+  loop: "{{ (hostvars['localhost']['jump_hosts'])|default([]) }}"
+  loop_control:
+    index_var: level
+  when: hostvars['localhost']['jump_hosts'] is defined
+
+- name: Default jumphost facts to extra variables
+  set_fact:
+    "{{ 'jumphost' ~ level ~ '_ip' }}": "{{ vars.get('jh' ~ level ~ '_ip') }}"
+    "{{ 'jumphost' ~ level ~ '_ssh_user' }}": "{{ vars.get('jh' ~ level ~ '_ssh_user') }}"
+    "{{ 'jumphost' ~ level ~ '_ssh_port' }}": "{{ vars.get('jh' ~ level ~ '_ssh_port') }}"
+    "{{ 'jumphost' ~ level ~ '_ssh_private_key' }}": "{{ lookup('vars', 'jh' ~ level ~ '_ssh_private_key') }}"
+    "{{ 'jumphost' ~ level ~ '_ssh_private_key_passphrase' }}": "{{ lookup('vars', 'jh' ~ level ~ '_ssh_private_key_passphrase') }}"
+  loop: "{{ range(1, 6)|list }}"
+  loop_control:
+    loop_var: level
+  when: vars['jumphost' ~ level ~ '_ip'] is undefined and vars['jh' ~ level ~ '_ip'] is defined
+
+- name: Creating socks tunnel without passphrase for single jumphost
+  block:
+    - name: Setting of required socks_port variables for single jumphost
+      set_fact:
+        jh_socks_port: "{{ jh1_socks_port }}"
+      when:
+        - jh_socks_port is undefined
+        - jh1_socks_port is defined
+
+    - name: Creating socks tunnel without passphrase for single jumphost
+      shell: |
+        ps -ef | grep '/tmp/mysocks-{{ account_code }}-{{ trans_num }}-{{ jh_socks_port }}' | grep -v grep
+        if [ $? -ne 0 ]; then
+          bash -c 'ssh {% if socks_nopasswordauthentication %} -o PasswordAuthentication=no {% endif %}{% if socks_identitiesonly %} -o IdentitiesOnly=yes {% endif %}{% if socks_serveraliveinterval %} -o ServerAliveInterval=30 {% endif %}{% if socks_serveralivecountmax %} -o ServerAliveCountMax=3 {% endif %}{% if socks_exitonforwardfailure %} -o ExitOnForwardFailure=yes {% endif %}{% if socks_stricthostkeychecking %} -o StrictHostKeyChecking=no {% endif %}{% if socks_userknownhostsfile %} -o UserKnownHostsFile=/dev/null {% endif %}{% if socks_controlmaster %} -o ControlMaster=auto {% endif %}{% if socks_controlpersist %} -o ControlPersist=no {% endif %}{% if socks_switches %} -CfNq {% endif %} -D /tmp/mysocks-{{ account_code }}-{{ trans_num }}-{{ jh_socks_port }} -i {{ jumphost1_ssh_private_key }} -p {{ jumphost1_ssh_port }} {{ jumphost1_ssh_user }}@{{ jumphost1_ip }} -vvvvvv;sleep 5'
+        fi
+  when:
+    - (jumphost2_ssh_private_key is undefined) or (jumphost2_ssh_private_key|length == 0)
+    - jumphost1_ssh_private_key is defined and (jumphost1_ssh_private_key|length > 0)
+    - (jumphost1_ssh_private_key_passphrase is undefined) or (jumphost1_ssh_private_key_passphrase is none) or (jumphost1_ssh_private_key_passphrase | trim == '')
+
+- name: Creating socks tunnel without passphrase for two jumphosts
+  block:
+    - name: Setting of required socks_port variables for two jumphosts
+      set_fact:
+        jh_socks_port: "{{ jh2_socks_port }}"
+      when:
+        - jh_socks_port is undefined
+        - jh2_socks_port is defined
+
+    - name: Creating socks tunnel without passphrase for two jumphosts
+      shell: |
+        ps -ef | grep '/tmp/mysocks-{{ account_code }}-{{ trans_num }}-{{ jh_socks_port }}' | grep -v grep
+        if [ $? -ne 0 ]; then
+          bash -c 'ssh {% if socks_nopasswordauthentication %} -o PasswordAuthentication=no {% endif %}{% if socks_identitiesonly %} -o IdentitiesOnly=yes {% endif %}{% if socks_serveraliveinterval %} -o ServerAliveInterval=30 {% endif -%}{% if socks_serveralivecountmax %} -o ServerAliveCountMax=3 {% endif %}{% if socks_exitonforwardfailure %} -o ExitOnForwardFailure=yes {% endif %}{% if socks_stricthostkeychecking %} -o StrictHostKeyChecking=no {% endif %}{% if socks_userknownhostsfile %} -o UserKnownHostsFile=/dev/null {% endif %}{% if socks_controlmaster %} -o ControlMaster=auto {% endif %}{% if socks_controlpersist %} -o ControlPersist=no {% endif %}{% if socks_switches %} -CfNq {% endif %}-i {{ jumphost2_ssh_private_key }} -oProxyCommand="ssh -i {{ jumphost1_ssh_private_key }} -W {{ jumphost2_ip }}:{{ jumphost2_ssh_port }} {% if socks_serveraliveinterval %} -o ServerAliveInterval=30 {% endif -%}{% if socks_nopasswordauthentication %} -o PasswordAuthentication=no {% endif %}{% if socks_identitiesonly %} -o IdentitiesOnly=yes {% endif %}{% if socks_serveralivecountmax %} -o ServerAliveCountMax=3 {% endif %}{% if socks_exitonforwardfailure %} -o ExitOnForwardFailure=yes {% endif %}{% if socks_stricthostkeychecking %} -o StrictHostKeyChecking=no {% endif %}{% if socks_userknownhostsfile %} -o UserKnownHostsFile=/dev/null {% endif %}{% if socks_controlmaster %} -o ControlMaster=auto {% endif %}{% if socks_controlpersist %} -o ControlPersist=no {% endif %}{% if socks_switches %} -CfNq {% endif %} -p {{ jumphost1_ssh_port }} {{ jumphost1_ssh_user }}@{{ jumphost1_ip }}" -D /tmp/mysocks-{{ account_code }}-{{ trans_num }}-{{ jh_socks_port }} -p {{ jumphost2_ssh_port }} {{ jumphost2_ssh_user }}@{{ jumphost2_ip }} -vvvvvv;sleep 5'
+        fi
+  when:
+    - (jumphost3_ssh_private_key is undefined) or (jumphost3_ssh_private_key|length == 0)
+    - jumphost2_ssh_private_key is defined and (jumphost2_ssh_private_key|length > 0)
+    - (jumphost1_ssh_private_key_passphrase is undefined) or (jumphost1_ssh_private_key_passphrase is none) or (jumphost1_ssh_private_key_passphrase | trim == '')
+
+- name: Creating socks tunnel without passphrase for 3 jumphosts
+  block:
+    - name: Setting of required socks_port variables for 3 jumphosts
+      set_fact:
+        jh_socks_port: "{{ jh3_socks_port }}"
+      when:
+        - jh_socks_port is undefined
+        - jh3_socks_port is defined
+
+    - name: Creating socks tunnel without passphrase for 3 jumphosts
+      shell: |
+        ps -ef | grep '/tmp/mysocks-{{ account_code }}-{{ trans_num }}-{{ jh_socks_port }}' | grep -v grep
+        if [ $? -ne 0 ]; then
+          bash -c 'ssh -i {{ jumphost3_ssh_private_key }} {% if socks_nopasswordauthentication %} -o PasswordAuthentication=no {% endif %}{% if socks_identitiesonly %} -o IdentitiesOnly=yes {% endif %}{% if socks_serveraliveinterval %} -o ServerAliveInterval=30 {% endif -%}{% if socks_serveralivecountmax %} -o ServerAliveCountMax=3 {% endif %}{% if socks_exitonforwardfailure %} -o ExitOnForwardFailure=yes {% endif %}{% if socks_stricthostkeychecking %} -o StrictHostKeyChecking=no {% endif %}{% if socks_userknownhostsfile %} -o UserKnownHostsFile=/dev/null {% endif %}{% if socks_controlmaster %} -o ControlMaster=auto {% endif %}{% if socks_controlpersist %} -o ControlPersist=no {% endif %}{% if socks_switches %} -CfNq {% endif %} -oProxyCommand="ssh -i {{ jumphost2_ssh_private_key }} -W {{ jumphost3_ip }}:{{ jumphost3_ssh_port }} {% if socks_nopasswordauthentication %} -o PasswordAuthentication=no {% endif %}{% if socks_identitiesonly %} -o IdentitiesOnly=yes {% endif %}{% if socks_serveraliveinterval %} -o ServerAliveInterval=30 {% endif -%}{% if socks_serveralivecountmax %} -o ServerAliveCountMax=3 {% endif %}{% if socks_exitonforwardfailure %} -o ExitOnForwardFailure=yes {% endif %}{% if socks_stricthostkeychecking %} -o StrictHostKeyChecking=no {% endif %}{% if socks_userknownhostsfile %} -o UserKnownHostsFile=/dev/null {% endif %}{% if socks_controlmaster %} -o ControlMaster=auto {% endif %}{% if socks_controlpersist %} -o ControlPersist=no {% endif %}{% if socks_switches %} -CfNq {% endif %} -oProxyCommand=\"ssh -i {{ jumphost1_ssh_private_key }} -W {{ jumphost2_ip }}:{{ jumphost2_ssh_port }} {% if socks_nopasswordauthentication %} -o PasswordAuthentication=no {% endif %}{% if socks_identitiesonly %} -o IdentitiesOnly=yes {% endif %}{% if socks_serveraliveinterval %} -o ServerAliveInterval=30 {% endif -%}{% if socks_serveralivecountmax %} -o ServerAliveCountMax=3 {% endif %}{% if socks_exitonforwardfailure %} -o ExitOnForwardFailure=yes {% endif %}{% if socks_stricthostkeychecking %} -o StrictHostKeyChecking=no {% endif %}{% if socks_userknownhostsfile %} -o UserKnownHostsFile=/dev/null {% endif %}{% if socks_controlmaster %} -o ControlMaster=auto {% endif %}{% if socks_controlpersist %} -o ControlPersist=no {% endif %}{% if socks_switches %} -CfNq {% endif %} -p {{ jumphost1_ssh_port }} {{ jumphost1_ssh_user }}@{{ jumphost1_ip }}\" -p {{ jumphost2_ssh_port }} {{ jumphost2_ssh_user }}@{{ jumphost2_ip }}" -D /tmp/mysocks-{{ account_code }}-{{ trans_num }}-{{ jh_socks_port }} -p {{ jumphost3_ssh_port }} {{ jumphost3_ssh_user }}@{{ jumphost3_ip }} -vvvvvv;sleep 5'
+        fi
+  when:
+    - (jumphost4_ssh_private_key is undefined) or (jumphost4_ssh_private_key|length == 0)
+    - jumphost3_ssh_private_key is defined and (jumphost3_ssh_private_key|length > 0)
+    - (jumphost1_ssh_private_key_passphrase is undefined) or (jumphost1_ssh_private_key_passphrase is none) or (jumphost1_ssh_private_key_passphrase | trim == '')
+
+
+- name: Creating socks tunnel without passphrase for 4 jumphosts
+  block:
+    - name: Setting of required socks_port variables for 4 jumphosts
+      set_fact:
+        jh_socks_port: "{{ jh4_socks_port }}"
+      when:
+        - jh_socks_port is undefined
+        - jh4_socks_port is defined
+
+    - name: Creating socks tunnel without passphrase for 4 jumphosts
+      shell: |
+        ps -ef | grep '/tmp/mysocks-{{ account_code }}-{{ trans_num }}-{{ jh_socks_port }}' | grep -v grep
+        if [ $? -ne 0 ]; then
+          bash -c 'ssh -i {{ jumphost4_ssh_private_key }} -oPubkeyAuthentication=yes {% if socks_nopasswordauthentication %} -o PasswordAuthentication=no {% endif %}{% if socks_identitiesonly %} -o IdentitiesOnly=yes {% endif %}{% if socks_stricthostkeychecking %} -o StrictHostKeyChecking=no {% endif %}{% if socks_userknownhostsfile %} -o UserKnownHostsFile=/dev/null {% endif %} -oProxyCommand="ssh -i {{ jumphost3_ssh_private_key }} -W {{ jumphost4_ip }}:{{ jumphost4_ssh_port }} -oPubkeyAuthentication=yes {% if socks_nopasswordauthentication %} -o PasswordAuthentication=no {% endif %}{% if socks_identitiesonly %} -o IdentitiesOnly=yes {% endif %}{% if socks_stricthostkeychecking %} -o StrictHostKeyChecking=no {% endif %}{% if socks_userknownhostsfile %} -o UserKnownHostsFile=/dev/null {% endif %} -oProxyCommand=\"ssh -i {{ jumphost2_ssh_private_key }} -W {{ jumphost3_ip }}:{{ jumphost3_ssh_port }} -oPubkeyAuthentication=yes {% if socks_nopasswordauthentication %} -o PasswordAuthentication=no {% endif %}{% if socks_identitiesonly %} -o IdentitiesOnly=yes {% endif %}{% if socks_stricthostkeychecking %} -o StrictHostKeyChecking=no {% endif %}{% if socks_userknownhostsfile %} -o UserKnownHostsFile=/dev/null {% endif %} -oProxyCommand=\\\"ssh -i {{ jumphost1_ssh_private_key }} -W {{ jumphost2_ip }}:{{ jumphost2_ssh_port }} -oPubkeyAuthentication=yes {% if socks_nopasswordauthentication %} -o PasswordAuthentication=no {% endif %}{% if socks_identitiesonly %} -o IdentitiesOnly=yes {% endif %}{% if socks_stricthostkeychecking %} -o StrictHostKeyChecking=no {% endif %}{% if socks_userknownhostsfile %} -o UserKnownHostsFile=/dev/null {% endif %} -p {{ jumphost1_ssh_port }} {{ jumphost1_ssh_user }}@{{ jumphost1_ip }}\\\" -p {{ jumphost2_ssh_port }} {{ jumphost2_ssh_user }}@{{ jumphost2_ip }}\" -p {{ jumphost3_ssh_port }} {{ jumphost3_ssh_user }}@{{ jumphost3_ip }}" -fN -D /tmp/mysocks-{{ account_code }}-{{ trans_num }}-{{ jh_socks_port }} -p {{ jumphost4_ssh_port }} {{ jumphost4_ssh_user }}@{{ jumphost4_ip }} -vvvvv;sleep 5'
+        fi
+  when:
+    - (jumphost5_ssh_private_key is undefined) or (jumphost5_ssh_private_key|length == 0)
+    - jumphost4_ssh_private_key is defined and (jumphost4_ssh_private_key|length > 0)
+    - (jumphost1_ssh_private_key_passphrase is undefined) or (jumphost1_ssh_private_key_passphrase is none) or (jumphost1_ssh_private_key_passphrase | trim == '')
+
+
+- name: Creating socks tunnel without passphrase for 5 jumphosts
+  block:
+    - name: Setting of required socks_port variables for 5 jumphosts
+      set_fact:
+        jh_socks_port: "{{ jh5_socks_port }}"
+      when:
+        - jh_socks_port is undefined
+        - jh5_socks_port is defined
+
+    - name: Creating socks tunnel without passphrase for 5 jumphosts
+      shell: |
+        ps -ef | grep '/tmp/mysocks-{{ account_code }}-{{ trans_num }}-{{ jh_socks_port }}' | grep -v grep
+        if [ $? -ne 0 ]; then
+          bash -c 'ssh -i {{ jumphost5_ssh_private_key }} -oPubkeyAuthentication=yes {% if socks_nopasswordauthentication %} -o PasswordAuthentication=no {% endif %}{% if socks_identitiesonly %} -o IdentitiesOnly=yes {% endif %}{% if socks_stricthostkeychecking %} -o StrictHostKeyChecking=no {% endif %}{% if socks_userknownhostsfile %} -o UserKnownHostsFile=/dev/null {% endif %} -oProxyCommand="ssh -i {{ jumphost4_ssh_private_key }} -W {{ jumphost5_ip }}:{{ jumphost5_ssh_port }} -oPubkeyAuthentication=yes {% if socks_nopasswordauthentication %} -o PasswordAuthentication=no {% endif %}{% if socks_identitiesonly %} -o IdentitiesOnly=yes {% endif %}{% if socks_stricthostkeychecking %} -o StrictHostKeyChecking=no {% endif %}{% if socks_userknownhostsfile %} -o UserKnownHostsFile=/dev/null {% endif %} -oProxyCommand=\"ssh -i {{ jumphost3_ssh_private_key }} -W {{ jumphost4_ip }}:{{ jumphost4_ssh_port }} -oPubkeyAuthentication=yes {% if socks_nopasswordauthentication %} -o PasswordAuthentication=no {% endif %}{% if socks_identitiesonly %} -o IdentitiesOnly=yes {% endif %}{% if socks_stricthostkeychecking %} -o StrictHostKeyChecking=no {% endif %}{% if socks_userknownhostsfile %} -o UserKnownHostsFile=/dev/null {% endif %} -oProxyCommand=\\\"ssh -i {{ jumphost2_ssh_private_key }} -W {{ jumphost3_ip }}:{{ jumphost3_ssh_port }} -oPubkeyAuthentication=yes {% if socks_nopasswordauthentication %} -o PasswordAuthentication=no {% endif %}{% if socks_identitiesonly %} -o IdentitiesOnly=yes {% endif %}{% if socks_stricthostkeychecking %} -o StrictHostKeyChecking=no {% endif %}{% if socks_userknownhostsfile %} -o UserKnownHostsFile=/dev/null {% endif %} -oProxyCommand=\\\\\\\"ssh -i {{ jumphost1_ssh_private_key }} -W {{ jumphost2_ip }}:{{ jumphost2_ssh_port }} -oPubkeyAuthentication=yes {% if socks_nopasswordauthentication %} -o PasswordAuthentication=no {% endif %}{% if socks_identitiesonly %} -o IdentitiesOnly=yes {% endif %}{% if socks_stricthostkeychecking %} -o StrictHostKeyChecking=no {% endif %}{% if socks_userknownhostsfile %} -o UserKnownHostsFile=/dev/null {% endif %} -p {{ jumphost1_ssh_port }} {{ jumphost1_ssh_user }}@{{ jumphost1_ip }}\\\\\\\" -p {{ jumphost2_ssh_port }} {{ jumphost2_ssh_user }}@{{ jumphost2_ip }}\\\" -p {{ jumphost3_ssh_port }} {{ jumphost3_ssh_user }}@{{ jumphost3_ip }}\" -p {{ jumphost4_ssh_port }} {{ jumphost4_ssh_user }}@{{ jumphost4_ip }}" -fN -D /tmp/mysocks-{{ account_code }}-{{ trans_num }}-{{ jh_socks_port }} -p {{ jumphost5_ssh_port }} {{ jumphost5_ssh_user }}@{{ jumphost5_ip }} -vvvvv;sleep 5'
+        fi
+  when:
+    - (jumphost6_ssh_private_key is undefined) or (jumphost6_ssh_private_key|length == 0)
+    - jumphost5_ssh_private_key is defined and (jumphost5_ssh_private_key|length > 0)
+    - (jumphost1_ssh_private_key_passphrase is undefined) or (jumphost1_ssh_private_key_passphrase is none) or (jumphost1_ssh_private_key_passphrase | trim == '')
+
+
+- name: Validate created unix socket
+  block:
+    - name: Validate socks file
+      stat:
+        path: /tmp/mysocks-{{ account_code }}-{{ trans_num }}-{{ jh_socks_port }}
+      register: file_stat
+
+    - name: Set fact for validate socks file
+      set_fact:
+        Socks_File_Created: "{{ 'SUCCESS' if file_stat.stat.exists == true else 'FAILED' }}"
+      no_log: true
+      
+- debug: var=jh_socks_port
+  when: jh_socks_port is defined
+    
+#- name: Report success
+#  when: hostvars['localhost']['Socks_File_Created']=='SUCCESS'
+#  block:
+#    - name: Calling returncode BB
+#      include_role:
+#        name: returncode
+#      vars:
+#        rc_success: true
+#        store_results_in_custom_stats: false
+#        inventory_hostname: "{{ hostvars['localhost']['affected_host'] }}"
+#  rescue:
+#   - name: "Set exec results for unexpected failure of calling returncode role"
+#      debug:
+#        msg: "Unexpected failure in triggered returncode role"
+#    - meta: clear_host_errors
+
+- name: Something in block failed. Generate error.
+  when: hostvars['localhost']['Socks_File_Created']=='FAILED'
+  block:
+    - name: Calling returncode BB
+      include_role:
+        name: returncode
+      vars:
+        rc_support: account
+        rc_group: connection_issue
+        rc_number: 102
+        rc_message: "FAILED-Socks Connection Failure."
+        documentation: "http://github.kyndryl.net/Continuous-Engineering/ansible-role-event-socks-tunnel"
+        inventory_hostname: "{{ hostvars['localhost']['affected_host'] | default('localhost') }}"
+  rescue:
+    - name: "Set exec results for unexpected failure of calling returncode role"
+      debug:
+        msg: "Unexpected failure in triggered returncode role"
+    - meta: clear_host_errors
