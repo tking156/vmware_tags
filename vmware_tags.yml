@@ -34,6 +34,57 @@
         documentation:
           default: "https://github.kyndryl.net/CACF-NA-Anthem/vmware_tags.git"
 
+    # block for assertion of variables
+    - name: block for variable assertion
+      block:
+
+        - name: Asserting variables
+          ansible.builtin.assert:
+            that:
+              - vt_vcenters_list is defined
+              - vt_guests_list is defined
+            fail_msg: "One of the required variables is not defined"
+
+      rescue:
+          # Set returncode and event automation facts if only vfv_vm_names is bad
+        - name: Set exec vars vt_vcenters_list is invalid or empty
+          ansible.builtin.set_fact:
+            exec_success: false
+            exec_changed: false
+            exec_rc: 1000
+            exec_message: |
+              vt_vcenters_list is invalid or empty
+            vfv_rc_number: 3000
+            vfv_rc_message: "vt_vcenters_list is invalid or empty"
+          when:
+            - vt_vcenters_list is iterable
+            - vt_vcenters_list | length > 0
+
+        - name: Set exec vars vt_guests_list is invalid or empty
+          ansible.builtin.set_fact:
+            exec_success: false
+            exec_changed: false
+            exec_rc: 1001
+            exec_message: |
+              vt_guests_list is invalid or empty
+            vfv_rc_number: 3001
+            vfv_rc_message: "vt_guests_list is invalid or empty"
+          when:
+            - vt_guests_list is iterable
+            - vt_guests_list | length > 0
+
+
+    - name: Converting strings of tags into lists
+      ansible.builtin.set_fact:
+        vt_associate_tags: "{{ vt_associate_tags.split(vfv_delimiter)
+                            if vt_associate_tags is string and
+                            vt_associate_tags | trim | length > 0
+                            else vt_associate_tags }}"
+        vt_disassociate_tags: "{{ vt_disassociate_tags.split(vfv_delimiter)
+                                    if vt_disassociate_tags is string and
+                                    vt_disassociate_tags | trim | length > 0
+                                    else vt_disassociate_tags }}"
+
       # Execution block to get hosts list from vcenter
     - name: Execution block 1
       block:
