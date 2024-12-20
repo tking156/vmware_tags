@@ -166,47 +166,47 @@
       debug:
         var: vfv_vm_vcenter
 
-    #   # Associate the tags to the VMs
-    # - name: Use community.vmware.vmware_tag_manager to associate tags to VMs
-    #   community.vmware.vmware_tag_manager:
-    #     hostname: "{{ item.vcenter }}"
-    #     username: "{{ lookup('ansible.builtin.env', 'vc_app_user') | default('missing_user') }}"
-    #     password: "{{ lookup('ansible.builtin.env', 'vc_app_password') | default('missing_pwd') }}"
-    #     validate_certs: "{{ vt_vmware_validate_certs }}"
-    #     object_name: "{{ item.guest }}"
-    #     object_type: "VirtualMachine"
-    #     tag_names: "{{ item.associate_tags }}"
-    #     state: present
-    #   loop: "{{ vfv_vm_vcenter }}"
-    #   register: tag_add_result
-    #   when: item.associate_tags is defined
+      # Associate the tags to the VMs
+    - name: Use community.vmware.vmware_tag_manager to associate tags to VMs
+      community.vmware.vmware_tag_manager:
+        hostname: "{{ item.vcenter }}"
+        username: "{{ lookup('ansible.builtin.env', 'vc_app_user') | default('missing_user') }}"
+        password: "{{ lookup('ansible.builtin.env', 'vc_app_password') | default('missing_pwd') }}"
+        validate_certs: "{{ vt_vmware_validate_certs }}"
+        object_name: "{{ item.guest }}"
+        object_type: "VirtualMachine"
+        tag_names: "{{ item.associate_tags }}"
+        state: present
+      loop: "{{ vfv_vm_vcenter }}"
+      register: tag_add_result
+      when: item.associate_tags is defined
 
-    #   # Disassociate the tags from the VMs
-    # - name: Use community.vmware.vmware_tag_manager to disassociate tags to VMs
-    #   community.vmware.vmware_tag_manager:
-    #     hostname: "{{ item.vcenter }}"
-    #     username: "{{ lookup('ansible.builtin.env', 'vc_app_user') | default('missing_user') }}"
-    #     password: "{{ lookup('ansible.builtin.env', 'vc_app_password') | default('missing_pwd') }}"
-    #     validate_certs: "{{ vt_vmware_validate_certs }}"
-    #     object_name: "{{ item.guest }}"
-    #     object_type: "VirtualMachine"
-    #     tag_names: "{{ item.disassociate_tags }}"
-    #     state: absent
-    #   loop: "{{ vfv_vm_vcenter }}"
-    #   register: tag_add_result
-    #   when: item.disassociate_tags is defined
+      # Disassociate the tags from the VMs
+    - name: Use community.vmware.vmware_tag_manager to disassociate tags to VMs
+      community.vmware.vmware_tag_manager:
+        hostname: "{{ item.vcenter }}"
+        username: "{{ lookup('ansible.builtin.env', 'vc_app_user') | default('missing_user') }}"
+        password: "{{ lookup('ansible.builtin.env', 'vc_app_password') | default('missing_pwd') }}"
+        validate_certs: "{{ vt_vmware_validate_certs }}"
+        object_name: "{{ item.guest }}"
+        object_type: "VirtualMachine"
+        tag_names: "{{ item.disassociate_tags }}"
+        state: absent
+      loop: "{{ vfv_vm_vcenter }}"
+      register: tag_add_result
+      when: item.disassociate_tags is defined
 
 
-    # - name: Use community.vmware to read all the tags
-    #   community.vmware.vmware_tag_info:
-    #     hostname: "{{ item.vcenter }}"
-    #     username: "{{ lookup('ansible.builtin.env', 'vc_app_user') | default('missing_user') }}"
-    #     password: "{{ lookup('ansible.builtin.env', 'vc_app_password') | default('missing_pwd') }}"
-    #     validate_certs: "{{ vt_vmware_validate_certs }}"
-    #     # name: "{{ item.guest }}"
-    #   loop: "{{ vfv_vm_vcenter }}"
-    #   register: tag_facts_result
+    - name: Use community.vmware to read all the tags
+      community.vmware.vmware_tag_info:
+        hostname: "{{ item.vcenter }}"
+        username: "{{ lookup('ansible.builtin.env', 'vc_app_user') | default('missing_user') }}"
+        password: "{{ lookup('ansible.builtin.env', 'vc_app_password') | default('missing_pwd') }}"
+        validate_certs: "{{ vt_vmware_validate_certs }}"
+        # name: "{{ item.guest }}"
+      loop: "{{ vfv_vm_vcenter }}"
+      register: tag_facts_result
 
-    # - name: "Print the tag_facts_result"
-    #   debug:
-    #     var: tag_facts_result
+    - name: "Print the tag_facts_result"
+      debug:
+        var: tag_facts_result
